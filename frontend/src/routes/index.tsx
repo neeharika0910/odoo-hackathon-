@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import truck3d from "@/assets/truck-3d.png";
-import logoAsset from "@/assets/transitops-logo.png.asset.json";
+import logoAsset from "@/assets/transitops-logo.png";
 
 export const Route = createFileRoute("/")({
   component: LoginPage,

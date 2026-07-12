@@ -9,21 +9,47 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import truck3d from "@/assets/truck-3d.png";
 import logoAsset from "@/assets/transitops-logo.png";
-
+import api from "@/lib/api";
 export const Route = createFileRoute("/")({
   component: LoginPage,
 });
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("alex.kim@transitops.io");
-  const [password, setPassword] = useState("••••••••");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    navigate({ to: "/dashboard" });
-  };
+ const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
 
+  try {
+    const response = await api.post("/auth/login", {
+      email,
+      password,
+    });
+
+    localStorage.setItem("token", response.data.token);
+    localStorage.setItem("user", JSON.stringify(response.data.user));
+
+    alert("Login Successful");
+
+    navigate({
+      to: "/dashboard",
+    });
+
+  } 
+  catch (error: any) {
+  console.log("Error:", error);
+
+  if (error.response) {
+    console.log("Backend:", error.response.data);
+    alert(error.response.data.message);
+  } else {
+    console.log(error.message);
+    alert(error.message);
+  }
+}
+};
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Left — brand panel */}
@@ -33,7 +59,7 @@ function LoginPage() {
 
         <div className="flex items-center gap-3">
           <img
-            src={logoAsset.url}
+            src={logoAsset}
             alt="TransitOps logo"
             width={44}
             height={44}
@@ -83,7 +109,7 @@ function LoginPage() {
         >
           <div className="mb-8 text-center lg:text-left">
             <img
-              src={logoAsset.url}
+              src={logoAsset}
               alt=""
               width={56}
               height={56}

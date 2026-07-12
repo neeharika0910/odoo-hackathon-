@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -19,7 +19,8 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { vehicles } from "@/data/mock";
+import api from "@/lib/api";
+
 import type { Vehicle } from "@/types";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import logistics3d from "@/assets/logistics-3d.png";
@@ -37,7 +38,28 @@ function VehiclesPage() {
   const [page, setPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
+const [vehicles, setVehicles] = useState([]);
+const [loading, setLoading] = useState(true);
+  useEffect(() => {
+  fetchVehicles();
+}, []);
 
+const fetchVehicles = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await api.get("/vehicles", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    setVehicles(res.data);
+  } catch (err) {
+    console.log(err);
+  }
+};
+const [vehicles, setVehicles] = useState([]);
   const filtered = useMemo(
     () =>
       vehicles.filter((v) => {

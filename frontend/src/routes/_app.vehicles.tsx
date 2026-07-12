@@ -38,7 +38,7 @@ function VehiclesPage() {
   const [page, setPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
-const [vehicles, setVehicles] = useState([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 const [loading, setLoading] = useState(true);
   useEffect(() => {
   fetchVehicles();
@@ -57,9 +57,10 @@ const fetchVehicles = async () => {
     setVehicles(res.data);
   } catch (err) {
     console.log(err);
+  } finally {
+    setLoading(false);
   }
 };
-const [vehicles, setVehicles] = useState([]);
   const filtered = useMemo(
     () =>
       vehicles.filter((v) => {

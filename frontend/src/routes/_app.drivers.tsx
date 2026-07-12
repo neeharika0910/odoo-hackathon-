@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Search, Phone, Mail } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { SafetyRing } from "@/components/shared/SafetyRing";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -16,38 +17,174 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import {
-  Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
+  Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter
 } from "@/components/ui/sheet";
-import { drivers, trips } from "@/data/mock";
+import api from "@/lib/api";
 import type { Driver } from "@/types";
 import { formatDate, formatNumber, initials } from "@/lib/format";
 import logistics3d from "@/assets/logistics-3d.png";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/_app/drivers")({
   component: DriversPage,
 });
 
 function DriversPage() {
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Driver | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = useMemo(
-    () => drivers.filter((d) => d.name.toLowerCase().includes(search.toLowerCase())),
-    [search],
+const [drivers, setDrivers] = useState<Driver[]>([]);
+
+const [search, setSearch] = useState("");
+
+const [selected, setSelected] = useState<Driver | null>(null);
+const [drawerOpen, setDrawerOpen] = useState(false);
+
+const [editing, setEditing] = useState<Driver | null>(null);
+
+const [formData, setFormData] = useState({
+  name: "",
+  licenseNumber: "",
+  licenseCategory: "LMV",
+  licenseExpiry: "",
+  contactNumber: "",
+  safetyScore: 100,
+  status: "available",
+});
+
+useEffect(() => {
+  fetchDrivers();
+}, []);
+
+const fetchDrivers = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await api.get("/drivers", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    setDrivers(res.data);
+  } catch (err) {
+    console.log(err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const resetForm = () => {
+  setFormData({
+    name: "",
+    licenseNumber: "",
+    licenseCategory: "LMV",
+    licenseExpiry: "",
+    contactNumber: "",
+    safetyScore: 100,
+    status: "available",
+  });
+
+  setEditing(null);
+};
+
+const openAdd = () => {
+  resetForm();
+  setDrawerOpen(true);
+};
+
+const openEdit = (driver: Driver) => {
+  setEditing(driver);
+
+  setFormData({
+    name: driver.name,
+    licenseNumber: driver.licenseNumber,
+    licenseCategory: driver.licenseCategory,
+    licenseExpiry: driver.licenseExpiry?.slice(0, 10),
+    contactNumber: driver.contactNumber,
+    safetyScore: driver.safetyScore,
+    status: driver.status,
+  });
+
+  setDrawerOpen(true);
+};
+  const filtered = useMemo(() => {
+  return drivers.filter((d) =>
+    d.name.toLowerCase().includes(search.toLowerCase())
   );
+}, [drivers, search]);
+if (loading) {
+  return (
+    <div className="flex h-[60vh] items-center justify-center">
+      Loading Drivers...
+    </div>
+  );
+}
 
+
+const handleSaveDriver = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    if (editing) {
+      await api.put(
+        `/drivers/${editing._id}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      toast.success("Driver Updated");
+    } else {
+      await api.post(
+        "/drivers",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      toast.success("Driver Added");
+    }
+
+    fetchDrivers();
+
+    setDrawerOpen(false);
+
+    resetForm();
+
+  } catch (err: any) {
+    console.log(err);
+
+    toast.error(
+      err?.response?.data?.message ||
+      "Failed to save driver"
+    );
+  }
+};
   return (
     <div>
       <PageHeader
         title="Drivers"
         description={`${drivers.length} drivers · ${drivers.filter((d) => d.status === "on-duty").length} on duty`}
         actions={
-          <Button
-            className="gap-1.5 rounded-xl"
-            onClick={() => toast.success("Driver invitation sent", { description: "This is a demo — no data was changed." })}
-          >
-            <Plus className="h-4 w-4" /> Add Driver
-          </Button>
+         <Button
+  className="gap-1.5 rounded-xl"
+  onClick={openAdd}
+>
+  <Plus className="h-4 w-4" />
+  Add Driver
+</Button>
         }
       />
 
@@ -88,37 +225,62 @@ function DriversPage() {
                   className="text-left"
                 >
                   <Card className="h-full rounded-2xl border-border/70 shadow-card card-lift">
+                    
                     <CardContent className="p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <Avatar className="h-11 w-11 shrink-0">
-                            <AvatarFallback className="bg-accent font-semibold text-accent-foreground">
-                              {initials(d.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold">{d.name}</p>
-                            <StatusBadge status={d.status} className="mt-0.5 text-[10px]" />
-                          </div>
-                        </div>
-                        <SafetyRing score={d.safetyScore} />
-                      </div>
-                      <Separator className="my-4" />
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{d.totalTrips} trips</span>
-                        <span>{formatNumber(d.totalKm)} km</span>
-                        <Badge
-                          variant="outline"
-                          className={
-                            d.licenseValid
-                              ? "rounded-full border-transparent bg-success/10 text-success"
-                              : "rounded-full border-transparent bg-destructive/10 text-destructive"
-                          }
-                        >
-                          {d.licenseValid ? "License valid" : "Expiring"}
-                        </Badge>
-                      </div>
-                    </CardContent>
+
+  <div className="flex items-center justify-between">
+
+    <div className="flex items-center gap-3">
+
+      <Avatar className="h-12 w-12">
+        <AvatarFallback>
+          {initials(d.name)}
+        </AvatarFallback>
+      </Avatar>
+
+      <div>
+
+        <h3 className="font-semibold">
+          {d.name}
+        </h3>
+
+        <StatusBadge status={d.status} />
+
+      </div>
+
+    </div>
+
+    <SafetyRing score={d.safetyScore} />
+
+  </div>
+
+  <Separator className="my-4" />
+
+  <div className="space-y-2 text-sm">
+
+    <p>
+      <strong>License:</strong>{" "}
+      {d.licenseNumber}
+    </p>
+
+    <p>
+      <strong>Category:</strong>{" "}
+      {d.licenseCategory}
+    </p>
+
+    <p>
+      <strong>Contact:</strong>{" "}
+      {d.contactNumber}
+    </p>
+
+    <p>
+      <strong>Expiry:</strong>{" "}
+      {formatDate(d.licenseExpiry)}
+    </p>
+
+  </div>
+
+</CardContent>
                   </Card>
                 </motion.button>
               ))}
@@ -139,41 +301,78 @@ function DriversPage() {
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
-                    {filtered.map((d) => (
-                      <TableRow key={d.id} className="cursor-pointer" onClick={() => setSelected(d)}>
-                        <TableCell>
-                          <div className="flex items-center gap-2.5">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-                                {initials(d.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium">{d.name}</p>
-                              <p className="text-xs text-muted-foreground">{d.email}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <Badge
-                            variant="outline"
-                            className={
-                              d.licenseValid
-                                ? "rounded-full border-transparent bg-success/10 text-success"
-                                : "rounded-full border-transparent bg-destructive/10 text-destructive"
-                            }
-                          >
-                            {d.licenseValid ? "Valid" : "Expiring"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-right">{d.totalTrips}</TableCell>
-                        <TableCell className="hidden lg:table-cell text-right">{formatNumber(d.totalKm)} km</TableCell>
-                        <TableCell><SafetyRing score={d.safetyScore} size={36} /></TableCell>
-                        <TableCell><StatusBadge status={d.status} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
+                 <TableBody>
+
+  {filtered.map((d) => (
+
+    <TableRow
+      key={d._id}
+      onClick={() => openEdit(d)}
+      className="cursor-pointer"
+    >
+
+      <TableCell>
+
+        <div className="flex items-center gap-2">
+
+          <Avatar className="h-8 w-8">
+
+            <AvatarFallback>
+              {initials(d.name)}
+            </AvatarFallback>
+
+          </Avatar>
+
+          <span>{d.name}</span>
+
+        </div>
+
+      </TableCell>
+
+      <TableCell>
+
+        {d.licenseNumber}
+
+      </TableCell>
+
+      <TableCell>
+
+        {d.licenseCategory}
+
+      </TableCell>
+
+      <TableCell>
+
+        {formatDate(d.licenseExpiry)}
+
+      </TableCell>
+
+      <TableCell>
+
+        {d.contactNumber}
+
+      </TableCell>
+
+      <TableCell>
+
+        <SafetyRing
+          score={d.safetyScore}
+          size={36}
+        />
+
+      </TableCell>
+
+      <TableCell>
+
+        <StatusBadge status={d.status} />
+
+      </TableCell>
+
+    </TableRow>
+
+  ))}
+
+</TableBody>
                 </Table>
               </CardContent>
             </Card>
@@ -181,86 +380,198 @@ function DriversPage() {
         </Tabs>
       )}
 
-      {/* Driver profile drawer */}
-      <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
-          {selected && (
-            <>
-              <SheetHeader>
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-14 w-14">
-                    <AvatarFallback className="bg-primary text-lg font-bold text-primary-foreground">
-                      {initials(selected.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <SheetTitle>{selected.name}</SheetTitle>
-                    <SheetDescription>Professional driver · joined {formatDate(selected.joined)}</SheetDescription>
-                  </div>
-                </div>
-              </SheetHeader>
+<Sheet
+  open={drawerOpen}
+  onOpenChange={setDrawerOpen}
+>
+  <SheetContent className="w-full overflow-y-auto sm:max-w-md">
 
-              <div className="space-y-5 px-4 pb-6">
-                <div className="flex items-center justify-between rounded-2xl bg-accent p-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Safety score</p>
-                    <p className="font-display text-xl font-bold">{selected.safetyScore}/100</p>
-                  </div>
-                  <SafetyRing score={selected.safetyScore} size={56} />
-                </div>
+    <SheetHeader>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border p-3">
-                    <p className="text-xs text-muted-foreground">Total trips</p>
-                    <p className="font-display text-lg font-bold">{selected.totalTrips}</p>
-                  </div>
-                  <div className="rounded-xl border p-3">
-                    <p className="text-xs text-muted-foreground">Distance driven</p>
-                    <p className="font-display text-lg font-bold">{formatNumber(selected.totalKm)} km</p>
-                  </div>
-                  <div className="rounded-xl border p-3">
-                    <p className="text-xs text-muted-foreground">License</p>
-                    <p className="text-sm font-semibold">{selected.licenseNo}</p>
-                  </div>
-                  <div className="rounded-xl border p-3">
-                    <p className="text-xs text-muted-foreground">Expires</p>
-                    <p className="text-sm font-semibold">{formatDate(selected.licenseExpiry)}</p>
-                  </div>
-                </div>
+      <SheetTitle>
+        {editing ? "Edit Driver" : "Add Driver"}
+      </SheetTitle>
 
-                <div className="space-y-2 text-sm">
-                  <p className="flex items-center gap-2 text-muted-foreground">
-                    <Mail className="h-4 w-4" /> {selected.email}
-                  </p>
-                  <p className="flex items-center gap-2 text-muted-foreground">
-                    <Phone className="h-4 w-4" /> {selected.phone}
-                  </p>
-                </div>
+      <SheetDescription>
+        {editing
+          ? "Update driver information."
+          : "Register a new driver."}
+      </SheetDescription>
 
-                <div>
-                  <p className="mb-2 text-sm font-semibold">Recent trips</p>
-                  <div className="space-y-2">
-                    {trips
-                      .filter((t) => t.driverId === selected.id)
-                      .slice(0, 4)
-                      .map((t) => (
-                        <div key={t.id} className="flex items-center justify-between rounded-xl border p-3 text-sm">
-                          <div className="min-w-0">
-                            <p className="font-medium">{t.ref}</p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {t.origin} → {t.destination}
-                            </p>
-                          </div>
-                          <StatusBadge status={t.status} />
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+    </SheetHeader>
+
+    <div className="space-y-4 px-4 py-4">
+
+      {/* Driver Name */}
+
+      <div className="grid gap-2">
+
+        <Label>Name</Label>
+
+        <Input
+          value={formData.name}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              name: e.target.value,
+            })
+          }
+        />
+
+      </div>
+
+      {/* License Number */}
+
+      <div className="grid gap-2">
+
+        <Label>License Number</Label>
+
+        <Input
+          value={formData.licenseNumber}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              licenseNumber: e.target.value,
+            })
+          }
+        />
+
+      </div>
+
+      {/* License Category */}
+
+      <div className="grid gap-2">
+
+        <Label>License Category</Label>
+
+        <Input
+          value={formData.licenseCategory}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              licenseCategory: e.target.value,
+            })
+          }
+        />
+
+      </div>
+
+      {/* License Expiry */}
+
+      <div className="grid gap-2">
+
+        <Label>License Expiry</Label>
+
+        <Input
+          type="date"
+          value={formData.licenseExpiry}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              licenseExpiry: e.target.value,
+            })
+          }
+        />
+
+      </div>
+
+      {/* Contact */}
+
+      <div className="grid gap-2">
+
+        <Label>Contact Number</Label>
+
+        <Input
+          value={formData.contactNumber}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              contactNumber: e.target.value,
+            })
+          }
+        />
+
+      </div>
+
+      {/* Safety */}
+
+      <div className="grid gap-2">
+
+        <Label>Safety Score</Label>
+
+        <Input
+          type="number"
+          value={formData.safetyScore}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              safetyScore: Number(e.target.value),
+            })
+          }
+        />
+
+      </div>
+
+      {/* Status */}
+
+      <div className="grid gap-2">
+
+        <Label>Status</Label>
+
+        <Select
+          value={formData.status}
+          onValueChange={(value) =>
+            setFormData({
+              ...formData,
+              status: value,
+            })
+          }
+        >
+
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+
+          <SelectContent>
+
+            <SelectItem value="available">
+              Available
+            </SelectItem>
+
+            <SelectItem value="on_trip">
+              On Trip
+            </SelectItem>
+
+            <SelectItem value="off_duty">
+              Off Duty
+            </SelectItem>
+
+            <SelectItem value="suspended">
+              Suspended
+            </SelectItem>
+
+          </SelectContent>
+
+        </Select>
+
+      </div>
+
+    </div>
+
+    <SheetFooter>
+
+      <Button
+        className="rounded-xl"
+        onClick={handleSaveDriver}
+      >
+        {editing ? "Save Changes" : "Add Driver"}
+      </Button>
+
+    </SheetFooter>
+
+  </SheetContent>
+
+</Sheet>
     </div>
   );
 }

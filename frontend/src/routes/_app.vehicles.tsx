@@ -32,54 +32,230 @@ export const Route = createFileRoute("/_app/vehicles")({
 const PAGE_SIZE = 8;
 
 function VehiclesPage() {
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
-  const [type, setType] = useState("all");
-  const [page, setPage] = useState(1);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editing, setEditing] = useState<Vehicle | null>(null);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-const [loading, setLoading] = useState(true);
-  useEffect(() => {
-  fetchVehicles();
-}, []);
 
-const fetchVehicles = async () => {
+  const [loading, setLoading] = useState(true);
+
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+
+  const [search, setSearch] = useState("");
+
+  const [status, setStatus] = useState("all");
+
+  const [type, setType] = useState("all");
+
+  const [page, setPage] = useState(1);
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const [editing, setEditing] = useState<Vehicle | null>(null);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    registration: "",
+    type: "Heavy Truck",
+    status: "available",
+    capacityKg: "",
+    odometerKm: "",
+    acquisitionCost: "",
+    fuelType: "Diesel",
+    year: new Date().getFullYear(),
+  });
+
+  useEffect(() => {
+    fetchVehicles();
+  }, []);
+
+  const fetchVehicles = async () => {
+
+    try {
+
+      const token = localStorage.getItem("token");
+
+      const res = await api.get("/vehicles", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setVehicles(res.data);
+
+    } catch (err) {
+
+      console.log(err);
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  };
+
+  const resetForm = () => {
+
+    setFormData({
+      name: "",
+      registration: "",
+      type: "Heavy Truck",
+      status: "available",
+      capacityKg: "",
+      odometerKm: "",
+      acquisitionCost: "",
+      fuelType: "Diesel",
+      year: new Date().getFullYear(),
+    });
+
+    setEditing(null);
+
+  };
+
+  const openAdd = () => {
+
+    resetForm();
+
+    setDrawerOpen(true);
+
+  };
+
+
+  const filtered = useMemo(
+  () =>
+    vehicles.filter((v) => {
+      const q = search.toLowerCase();
+
+      return (
+        (v.name.toLowerCase().includes(q) ||
+          v.registration.toLowerCase().includes(q)) &&
+        (status === "all" || v.status === status) &&
+        (type === "all" || v.type === type)
+      );
+    }),
+  [vehicles, search, status, type]
+);
+
+const pages = Math.max(
+  1,
+  Math.ceil(filtered.length / PAGE_SIZE)
+);
+
+const current = Math.min(page, pages);
+
+const rows = filtered.slice(
+  (current - 1) * PAGE_SIZE,
+  current * PAGE_SIZE
+);
+
+  const openEdit = (vehicle: Vehicle) => {
+
+
+
+
+    setEditing(vehicle);
+
+    setFormData({
+
+      name: vehicle.name,
+
+      registration: vehicle.registration,
+
+      type: vehicle.type,
+
+      status: vehicle.status,
+
+      capacityKg: String(vehicle.capacityKg),
+
+      odometerKm: String(vehicle.odometerKm),
+
+      acquisitionCost: String(vehicle.acquisitionCost),
+
+      fuelType: vehicle.fuelType,
+
+      year: vehicle.year,
+
+    });
+
+    setDrawerOpen(true);
+
+  };
+
+
+  const handleSaveVehicle = async () => {
   try {
     const token = localStorage.getItem("token");
 
-    const res = await api.get("/vehicles", {
+    if (editing) {
+      await api.put(
+        `/vehicles/${editing._id}`,
+        {
+          ...formData,
+          capacityKg: Number(formData.capacityKg),
+          odometerKm: Number(formData.odometerKm),
+          acquisitionCost: Number(formData.acquisitionCost),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      toast.success("Vehicle updated successfully");
+    } else {
+      await api.post(
+        "/vehicles",
+        {
+          ...formData,
+          capacityKg: Number(formData.capacityKg),
+          odometerKm: Number(formData.odometerKm),
+          acquisitionCost: Number(formData.acquisitionCost),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      toast.success("Vehicle added successfully");
+    }
+
+    fetchVehicles();
+
+    resetForm();
+
+    setDrawerOpen(false);
+
+  } catch (err: any) {
+    console.log(err);
+
+    toast.error(
+      err?.response?.data?.message || "Failed to save vehicle"
+    );
+  }
+};
+
+const handleDeleteVehicle = async (id: string) => {
+  try {
+    const token = localStorage.getItem("token");
+
+    await api.delete(`/vehicles/${id}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
-    setVehicles(res.data);
-  } catch (err) {
+    toast.success("Vehicle deleted");
+
+    fetchVehicles();
+
+  } catch (err: any) {
     console.log(err);
-  } finally {
-    setLoading(false);
+
+    toast.error(
+      err?.response?.data?.message || "Delete failed"
+    );
   }
 };
-  const filtered = useMemo(
-    () =>
-      vehicles.filter((v) => {
-        const q = search.toLowerCase();
-        return (
-          (v.name.toLowerCase().includes(q) || v.registration.toLowerCase().includes(q)) &&
-          (status === "all" || v.status === status) &&
-          (type === "all" || v.type === type)
-        );
-      }),
-    [search, status, type],
-  );
-
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const current = Math.min(page, pages);
-  const rows = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-
-  const openAdd = () => { setEditing(null); setDrawerOpen(true); };
-  const openEdit = (v: Vehicle) => { setEditing(v); setDrawerOpen(true); };
 
   return (
     <div>
@@ -153,12 +329,12 @@ const fetchVehicles = async () => {
                   </TableHeader>
                   <TableBody>
                     {rows.map((v) => (
-                      <TableRow key={v.id} className="group">
+                      <TableRow key={v._id} className="group">
                         <TableCell className="font-mono text-xs">{v.registration}</TableCell>
                         <TableCell>
                           <Link
                             to="/vehicles/$vehicleId"
-                            params={{ vehicleId: v.id }}
+                            params={{ vehicleId: v._id }}
                             className="font-medium hover:text-primary hover:underline"
                           >
                             {v.name}
@@ -179,7 +355,7 @@ const fetchVehicles = async () => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem asChild>
-                                <Link to="/vehicles/$vehicleId" params={{ vehicleId: v.id }}>
+                                <Link to="/vehicles/$vehicleId" params={{ vehicleId: v._id }}>
                                   <Eye className="mr-2 h-4 w-4" /> View details
                                 </Link>
                               </DropdownMenuItem>
@@ -231,11 +407,29 @@ const fetchVehicles = async () => {
           <div className="grid gap-4 px-4 py-2">
             <div className="grid gap-2">
               <Label>Vehicle name</Label>
-              <Input defaultValue={editing?.name} placeholder="e.g. Volvo FH16 #26" />
+              <Input
+  value={formData.name}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      name: e.target.value,
+    })
+  }
+  placeholder="e.g. Volvo FH16 #26"
+/>
             </div>
             <div className="grid gap-2">
               <Label>Registration number</Label>
-              <Input defaultValue={editing?.registration} placeholder="TX-0000-AA" />
+             <Input
+  value={formData.registration}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      registration: e.target.value,
+    })
+  }
+  placeholder="TX-0000-AA"
+/>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2">
@@ -267,33 +461,56 @@ const fetchVehicles = async () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2">
                 <Label>Capacity (kg)</Label>
-                <Input type="number" defaultValue={editing?.capacityKg} placeholder="24000" />
-              </div>
+                <Input
+  type="number"
+  value={formData.capacityKg}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      capacityKg: e.target.value,
+    })
+  }
+/>
+</div>
               <div className="grid gap-2">
                 <Label>Odometer (km)</Label>
-                <Input type="number" defaultValue={editing?.odometerKm} placeholder="120000" />
+<Input
+  type="number"
+  value={formData.odometerKm}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      odometerKm: e.target.value,
+    })
+  }
+/>
               </div>
             </div>
             <div className="grid gap-2">
               <Label>Acquisition cost ($)</Label>
-              <Input type="number" defaultValue={editing?.acquisitionCost} placeholder="125000" />
+<Input
+  type="number"
+  value={formData.acquisitionCost}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      acquisitionCost: e.target.value,
+    })
+  }
+/>
             </div>
           </div>
           <SheetFooter>
             <Button
-              className="rounded-xl"
-              onClick={() => {
-                setDrawerOpen(false);
-                toast.success(editing ? "Vehicle updated" : "Vehicle added", {
-                  description: "This is a demo — no data was persisted.",
-                });
-              }}
-            >
-              {editing ? "Save changes" : "Add vehicle"}
-            </Button>
+  className="rounded-xl"
+  onClick={handleSaveVehicle}
+>
+  {editing ? "Save Changes" : "Add Vehicle"}
+</Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>
     </div>
+  
   );
 }

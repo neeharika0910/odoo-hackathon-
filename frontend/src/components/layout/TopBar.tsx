@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Bell, Moon, Search, Sun, LogOut, UserCircle, Settings } from "lucide-react";
+import {
+  Bell,
+  Moon,
+  Search,
+  Sun,
+  LogOut,
+  UserCircle,
+  Settings,
+} from "lucide-react";
+
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,6 +32,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+
 import { Badge } from "@/components/ui/badge";
 
 const labels: Record<string, string> = {
@@ -37,14 +49,38 @@ const labels: Record<string, string> = {
 };
 
 export function TopBar() {
-  const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const pathname = useRouterState({
+    select: (r) => r.location.pathname,
+  });
+
   const segments = pathname.split("/").filter(Boolean);
+
   const [dark, setDark] = useState(false);
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
+  const [user, setUser] = useState<any>({});
 
+
+  useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const storedUser = localStorage.getItem("user");
+
+  if (storedUser) {
+    setUser(JSON.parse(storedUser));
+  }
+}, []);
+
+useEffect(() => {
+  document.documentElement.classList.toggle("dark", dark);
+}, [dark]);
+
+const userName = user?.name || "User";
+
+const initials = userName
+  .split(" ")
+  .map((word: string) => word[0])
+  .join("")
+  .toUpperCase();
   return (
     <header className="sticky top-0 z-30 glass">
       <div className="flex h-14 items-center gap-3 px-4 lg:px-6">
@@ -131,16 +167,16 @@ export function TopBar() {
               <button className="ml-1 rounded-full ring-offset-background transition focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
-                    AK
+                    {initials}
                   </AvatarFallback>
                 </Avatar>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuLabel>
-                <p className="text-sm font-semibold">Alex Kim</p>
+                <p className="text-sm font-semibold">{userName}</p>
                 <p className="text-xs font-normal text-muted-foreground">
-                  Operations Manager
+                  {user.role || "Fleet Manager"}
                 </p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -155,11 +191,16 @@ export function TopBar() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/">
-                  <LogOut className="mr-2 h-4 w-4" /> Sign out
-                </Link>
-              </DropdownMenuItem>
+             <DropdownMenuItem
+  onClick={() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/";
+  }}
+>
+  <LogOut className="mr-2 h-4 w-4" />
+  Sign out
+</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
